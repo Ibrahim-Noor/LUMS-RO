@@ -47,14 +47,6 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex gap-3 flex-wrap">
-            {user?.role === "student" && (
-              <Link href="/requests">
-                <Button data-testid="button-new-request">
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Request
-                </Button>
-              </Link>
-            )}
             {user?.role === "instructor" && (
               <Link href="/petitions">
                 <Button data-testid="button-new-petition">
