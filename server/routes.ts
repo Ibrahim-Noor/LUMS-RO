@@ -62,7 +62,7 @@ export async function registerRoutes(
     const request = await storage.createDocumentRequest({
       ...input,
       userId: req.user!.id,
-    });
+    } as any);
     res.status(201).json(request);
   });
 
@@ -105,7 +105,7 @@ export async function registerRoutes(
     const petition = await storage.createPetition({
       ...input,
       instructorId: req.user!.id,
-    });
+    } as any);
     res.status(201).json(petition);
   });
 
@@ -126,7 +126,7 @@ export async function registerRoutes(
     const appData = await storage.createMajorApplication({
       ...input,
       studentId: req.user!.id,
-    });
+    } as any);
     res.status(201).json(appData);
   });
 
@@ -142,7 +142,12 @@ export async function registerRoutes(
   });
 
   app.post(api.calendar.create.path, requireRole("admin"), async (req, res) => {
-    const input = api.calendar.create.input.parse(req.body);
+    const body = {
+      ...req.body,
+      startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+      endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+    };
+    const input = api.calendar.create.input.parse(body);
     const event = await storage.createCalendarEvent({
       ...input,
       createdBy: req.user!.id,
