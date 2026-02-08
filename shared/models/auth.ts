@@ -1,8 +1,6 @@
 import { sql } from "drizzle-orm";
-import { index, jsonb, pgTable, timestamp, varchar, text } from "drizzle-orm/pg-core";
+import { index, jsonb, pgTable, timestamp, varchar, text, boolean } from "drizzle-orm/pg-core";
 
-// Session storage table.
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const sessions = pgTable(
   "sessions",
   {
@@ -13,18 +11,17 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)]
 );
 
-// User storage table.
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
-  username: text("username").unique(), // Replit username
+  username: text("username").unique().notNull(),
+  passwordHash: text("password_hash").notNull(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   fullName: text("full_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  role: text("role", { enum: ["student", "alumni", "faculty", "staff", "admin"] }).default("student").notNull(),
-  studentId: text("student_id"), // Nullable for staff/faculty
+  role: text("role", { enum: ["student", "instructor", "admin"] }).default("student").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  studentId: text("student_id"),
   department: text("department"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

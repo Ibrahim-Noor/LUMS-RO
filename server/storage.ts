@@ -1,48 +1,47 @@
-
 import { db } from "./db";
 import {
-  users, documentRequests, payments, gradeChangePetitions, majorApplications, calendarEvents,
+  users, documentRequests, payments, gradeChangePetitions, majorApplications, calendarEvents, notifications,
   type User, type InsertUser,
   type DocumentRequest, type InsertDocumentRequest,
   type Payment, type InsertPayment,
   type Petition, type InsertPetition,
   type MajorApplication, type InsertMajorApplication,
-  type CalendarEvent, type InsertCalendarEvent
+  type CalendarEvent, type InsertCalendarEvent,
+  type Notification, type InsertNotification
 } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
-  // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
 
-  // Document Requests
   getDocumentRequests(userId?: string): Promise<DocumentRequest[]>;
   getDocumentRequest(id: number): Promise<DocumentRequest | undefined>;
   createDocumentRequest(req: InsertDocumentRequest): Promise<DocumentRequest>;
+  updateDocumentRequestStatus(id: number, status: string, adminComment?: string): Promise<DocumentRequest>;
 
-  // Payments
   getPayments(requestId: number): Promise<Payment[]>;
-  createPayment(payment: InsertPayment): Promise<Payment>;
+  createPayment(payment: any): Promise<Payment>;
 
-  // Petitions
-  getPetitions(role: string, userId: string): Promise<Petition[]>; // Filter by role logic
+  getPetitions(role: string, userId: string): Promise<Petition[]>;
   createPetition(petition: InsertPetition): Promise<Petition>;
-  updatePetitionStatus(id: number, status: string): Promise<Petition>;
+  updatePetitionStatus(id: number, status: string, adminComment?: string): Promise<Petition>;
 
-  // Major Applications
   getMajorApplications(userId?: string): Promise<MajorApplication[]>;
   createMajorApplication(app: InsertMajorApplication): Promise<MajorApplication>;
+  updateMajorApplicationStatus(id: number, status: string, adminComment?: string): Promise<MajorApplication>;
 
-  // Calendar
   getCalendarEvents(): Promise<CalendarEvent[]>;
-  createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
+  createCalendarEvent(event: InsertCalendarEvent & { createdBy?: string }): Promise<CalendarEvent>;
+
+  getNotifications(userId: string): Promise<Notification[]>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationRead(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
-  // Users
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -63,7 +62,6 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  // Document Requests
   async getDocumentRequests(userId?: string): Promise<DocumentRequest[]> {
     if (userId) {
       return await db.select().from(documentRequests).where(eq(documentRequests.userId, userId)).orderBy(desc(documentRequests.createdAt));
@@ -81,26 +79,29 @@ export class DatabaseStorage implements IStorage {
     return request;
   }
 
-  // Payments
+  async updateDocumentRequestStatus(id: number, status: string, adminComment?: string): Promise<DocumentRequest> {
+    const updates: any = { status, updatedAt: new Date() };
+    if (adminComment !== undefined) updates.adminComment = adminComment;
+    const [req] = await db.update(documentRequests).set(updates).where(eq(documentRequests.id, id)).returning();
+    return req;
+  }
+
   async getPayments(requestId: number): Promise<Payment[]> {
     return await db.select().from(payments).where(eq(payments.requestId, requestId));
   }
 
-  async createPayment(payment: InsertPayment): Promise<Payment> {
+  async createPayment(payment: any): Promise<Payment> {
     const [p] = await db.insert(payments).values(payment).returning();
     return p;
   }
 
-  // Petitions
   async getPetitions(role: string, userId: string): Promise<Petition[]> {
-    if (role === 'student') {
-      return await db.select().from(gradeChangePetitions).where(eq(gradeChangePetitions.studentId, userId));
-    } else if (role === 'faculty') {
-      return await db.select().from(gradeChangePetitions).where(eq(gradeChangePetitions.instructorId, userId));
-    } else {
-      // Admin/Staff sees all
-      return await db.select().from(gradeChangePetitions);
+    if (role === 'instructor') {
+      return await db.select().from(gradeChangePetitions).where(eq(gradeChangePetitions.instructorId, userId)).orderBy(desc(gradeChangePetitions.createdAt));
+    } else if (role === 'admin') {
+      return await db.select().from(gradeChangePetitions).orderBy(desc(gradeChangePetitions.createdAt));
     }
+    return [];
   }
 
   async createPetition(petition: InsertPetition): Promise<Petition> {
@@ -108,17 +109,18 @@ export class DatabaseStorage implements IStorage {
     return p;
   }
 
-  async updatePetitionStatus(id: number, status: string): Promise<Petition> {
-    const [p] = await db.update(gradeChangePetitions).set({ status }).where(eq(gradeChangePetitions.id, id)).returning();
+  async updatePetitionStatus(id: number, status: string, adminComment?: string): Promise<Petition> {
+    const updates: any = { status, updatedAt: new Date() };
+    if (adminComment !== undefined) updates.adminComment = adminComment;
+    const [p] = await db.update(gradeChangePetitions).set(updates).where(eq(gradeChangePetitions.id, id)).returning();
     return p;
   }
 
-  // Major Applications
   async getMajorApplications(userId?: string): Promise<MajorApplication[]> {
     if (userId) {
-      return await db.select().from(majorApplications).where(eq(majorApplications.studentId, userId));
+      return await db.select().from(majorApplications).where(eq(majorApplications.studentId, userId)).orderBy(desc(majorApplications.createdAt));
     }
-    return await db.select().from(majorApplications);
+    return await db.select().from(majorApplications).orderBy(desc(majorApplications.createdAt));
   }
 
   async createMajorApplication(app: InsertMajorApplication): Promise<MajorApplication> {
@@ -126,14 +128,33 @@ export class DatabaseStorage implements IStorage {
     return a;
   }
 
-  // Calendar
+  async updateMajorApplicationStatus(id: number, status: string, adminComment?: string): Promise<MajorApplication> {
+    const updates: any = { status };
+    if (adminComment !== undefined) updates.adminComment = adminComment;
+    const [a] = await db.update(majorApplications).set(updates).where(eq(majorApplications.id, id)).returning();
+    return a;
+  }
+
   async getCalendarEvents(): Promise<CalendarEvent[]> {
     return await db.select().from(calendarEvents).orderBy(calendarEvents.startDate);
   }
 
-  async createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent> {
+  async createCalendarEvent(event: InsertCalendarEvent & { createdBy?: string }): Promise<CalendarEvent> {
     const [e] = await db.insert(calendarEvents).values(event).returning();
     return e;
+  }
+
+  async getNotifications(userId: string): Promise<Notification[]> {
+    return await db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [n] = await db.insert(notifications).values(notification).returning();
+    return n;
+  }
+
+  async markNotificationRead(id: number): Promise<void> {
+    await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
   }
 }
 

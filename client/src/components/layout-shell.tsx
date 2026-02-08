@@ -5,11 +5,9 @@ import {
   FileText, 
   GraduationCap, 
   Calendar, 
-  Settings, 
   LogOut,
   Menu,
   X,
-  CreditCard,
   Building2
 } from "lucide-react";
 import { useState } from "react";
@@ -21,28 +19,28 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const navItems = [
-    { label: "Dashboard", href: "/", icon: LayoutDashboard },
-    { label: "Document Requests", href: "/requests", icon: FileText },
-    { label: "Grade Petitions", href: "/petitions", icon: GraduationCap },
-    { label: "Major Declaration", href: "/majors", icon: Building2 },
-    { label: "Academic Calendar", href: "/calendar", icon: Calendar },
+  const allNavItems = [
+    { label: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["student", "instructor", "admin"] },
+    { label: "Document Requests", href: "/requests", icon: FileText, roles: ["student", "admin"] },
+    { label: "Grade Petitions", href: "/petitions", icon: GraduationCap, roles: ["instructor", "admin"] },
+    { label: "Major Declaration", href: "/majors", icon: Building2, roles: ["student", "admin"] },
+    { label: "Academic Calendar", href: "/calendar", icon: Calendar, roles: ["student", "instructor", "admin"] },
   ];
+
+  const navItems = allNavItems.filter(item => user?.role && item.roles.includes(user.role));
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row font-sans">
-      {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 bg-primary text-primary-foreground shadow-md sticky top-0 z-50">
         <div className="font-display font-bold text-lg flex items-center gap-2">
           <Building2 className="w-6 h-6 text-secondary" />
           LUMS Registrar
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(!sidebarOpen)} className="text-primary-foreground hover:bg-primary/80">
+        <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(!sidebarOpen)} className="text-primary-foreground hover:bg-primary/80" data-testid="button-mobile-menu">
           {sidebarOpen ? <X /> : <Menu />}
         </Button>
       </div>
 
-      {/* Sidebar Navigation */}
       <aside className={cn(
         "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen flex flex-col",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -60,11 +58,11 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
             const isActive = location === item.href;
             return (
               <Link key={item.href} href={item.href} className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group font-medium",
+                "flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group font-medium",
                 isActive 
                   ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25" 
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}>
+                  : "text-muted-foreground hover-elevate"
+              )} data-testid={`link-nav-${item.href.replace('/', '') || 'dashboard'}`}>
                 <item.icon className={cn("w-5 h-5", isActive ? "text-secondary" : "group-hover:text-primary")} />
                 {item.label}
               </Link>
@@ -78,14 +76,15 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
               {user?.fullName?.charAt(0) || "U"}
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-semibold truncate">{user?.fullName}</p>
-              <p className="text-xs text-muted-foreground capitalize">{user?.role || "User"}</p>
+              <p className="text-sm font-semibold truncate" data-testid="text-user-name">{user?.fullName}</p>
+              <p className="text-xs text-muted-foreground capitalize" data-testid="text-user-role">{user?.role || "User"}</p>
             </div>
           </div>
           <Button 
             variant="outline" 
-            className="w-full justify-start gap-2 border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+            className="w-full justify-start gap-2 border-destructive/20 text-destructive"
             onClick={() => logout()}
+            data-testid="button-logout"
           >
             <LogOut className="w-4 h-4" />
             Sign Out
@@ -93,7 +92,6 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* Overlay for mobile sidebar */}
       {sidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"
@@ -101,7 +99,6 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
         />
       )}
 
-      {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto bg-background/50 relative">
         <div className="max-w-7xl mx-auto p-4 md:p-8 animate-slide-in">
           {children}

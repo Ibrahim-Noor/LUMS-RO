@@ -14,7 +14,7 @@ import CalendarPage from "@/pages/calendar";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+function ProtectedRoute({ component: Component, allowedRoles }: { component: React.ComponentType; allowedRoles?: string[] }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -29,6 +29,10 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
     return <Login />;
   }
 
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <NotFound />;
+  }
+
   return <Component />;
 }
 
@@ -36,9 +40,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
-      <Route path="/requests" component={() => <ProtectedRoute component={DocumentRequests} />} />
-      <Route path="/petitions" component={() => <ProtectedRoute component={Petitions} />} />
-      <Route path="/majors" component={() => <ProtectedRoute component={MajorApplications} />} />
+      <Route path="/requests" component={() => <ProtectedRoute component={DocumentRequests} allowedRoles={["student", "admin"]} />} />
+      <Route path="/petitions" component={() => <ProtectedRoute component={Petitions} allowedRoles={["instructor", "admin"]} />} />
+      <Route path="/majors" component={() => <ProtectedRoute component={MajorApplications} allowedRoles={["student", "admin"]} />} />
       <Route path="/calendar" component={() => <ProtectedRoute component={CalendarPage} />} />
       <Route path="/login" component={Login} />
       <Route component={NotFound} />

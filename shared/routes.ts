@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 import { 
   insertUserSchema, 
@@ -15,9 +14,6 @@ import {
   calendarEvents
 } from './schema';
 
-// ============================================
-// SHARED ERROR SCHEMAS
-// ============================================
 export const errorSchemas = {
   validation: z.object({
     message: z.string(),
@@ -34,10 +30,36 @@ export const errorSchemas = {
   })
 };
 
-// ============================================
-// API CONTRACT
-// ============================================
 export const api = {
+  auth: {
+    login: {
+      method: 'POST' as const,
+      path: '/api/auth/login' as const,
+      input: z.object({
+        username: z.string().min(1),
+        password: z.string().min(1),
+      }),
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        401: errorSchemas.unauthorized,
+      },
+    },
+    logout: {
+      method: 'POST' as const,
+      path: '/api/auth/logout' as const,
+      responses: {
+        200: z.object({ message: z.string() }),
+      },
+    },
+    user: {
+      method: 'GET' as const,
+      path: '/api/auth/user' as const,
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        401: errorSchemas.unauthorized,
+      },
+    },
+  },
   users: {
     me: {
       method: 'GET' as const,
@@ -82,6 +104,18 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    updateStatus: {
+      method: 'PATCH' as const,
+      path: '/api/document-requests/:id/status' as const,
+      input: z.object({
+        status: z.enum(["submitted", "payment_pending", "pending_approval", "approved", "completed", "rejected"]),
+        adminComment: z.string().optional(),
+      }),
+      responses: {
+        200: z.custom<typeof documentRequests.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
   },
   payments: {
     process: {
@@ -119,7 +153,8 @@ export const api = {
       method: 'PATCH' as const,
       path: '/api/petitions/:id/status' as const,
       input: z.object({
-        status: z.enum(["approved_dept", "approved_dean", "approved_registrar", "rejected"])
+        status: z.enum(["pending_approval", "approved", "rejected"]),
+        adminComment: z.string().optional(),
       }),
       responses: {
         200: z.custom<typeof gradeChangePetitions.$inferSelect>(),
@@ -142,6 +177,18 @@ export const api = {
       responses: {
         201: z.custom<typeof majorApplications.$inferSelect>(),
         400: errorSchemas.validation,
+      },
+    },
+    updateStatus: {
+      method: 'PATCH' as const,
+      path: '/api/major-applications/:id/status' as const,
+      input: z.object({
+        status: z.enum(["pending_approval", "approved", "rejected"]),
+        adminComment: z.string().optional(),
+      }),
+      responses: {
+        200: z.custom<typeof majorApplications.$inferSelect>(),
+        404: errorSchemas.notFound,
       },
     },
   },

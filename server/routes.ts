@@ -1,170 +1,229 @@
-
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { z } from "zod";
-import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
+import { setupAuth, requireAuth, requireRole, hashPassword } from "./auth";
+import passport from "passport";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
 
-  // Setup Replit Auth
-  await setupAuth(app);
-  registerAuthRoutes(app);
+  setupAuth(app);
 
-  // === Users ===
-  app.get(api.users.me.path, async (req, res) => {
-    // Mock user for MVP if no auth header - In real app, Replit Auth middleware handles this
-    // For now, let's assume a default user if not authenticated, or require authentication
-    // Note: In Replit Auth, req.headers['x-replit-user-id'] is available.
-    
-    const username = req.headers['x-replit-user-name'] as string;
-    
-    if (!username) {
-      // Return 401 if not logged in
+  app.post(api.auth.login.path, (req, res, next) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) return next(err);
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+      req.logIn(user, (err) => {
+        if (err) return next(err);
+        const { passwordHash, ...safeUser } = user;
+        return res.json(safeUser);
+      });
+    })(req, res, next);
+  });
+
+  app.post(api.auth.logout.path, (req, res) => {
+    req.logout((err) => {
+      if (err) return res.status(500).json({ message: "Logout failed" });
+      req.session.destroy((err) => {
+        res.json({ message: "Logged out successfully" });
+      });
+    });
+  });
+
+  app.get(api.auth.user.path, (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
-
-    let user = await storage.getUserByUsername(username);
-    if (!user) {
-      // Auto-register user
-      user = await storage.createUser({
-        username,
-        email: `${username}@example.com`,
-        fullName: username,
-        role: "student", // Default role
-        studentId: "24100000",
-        department: "SSE"
-      });
-    }
-    res.json(user);
+    const { passwordHash, ...safeUser } = req.user!;
+    res.json(safeUser);
   });
 
-  app.patch(api.users.update.path, async (req, res) => {
-    const username = req.headers['x-replit-user-name'] as string;
-    if (!username) return res.status(401).json({ message: "Not authenticated" });
-    
-    const user = await storage.getUserByUsername(username);
-    if (!user) return res.status(404).json({ message: "User not found" });
+  app.get(api.documentRequests.list.path, requireRole("student", "admin"), async (req, res) => {
+    const user = req.user!;
+    const requests = await storage.getDocumentRequests(user.role === 'admin' ? undefined : user.id);
 
-    const updates = api.users.update.input.parse(req.body);
-    const updated = await storage.updateUser(user.id, updates);
-    res.json(updated);
+    const requestsWithPayments = await Promise.all(
+      requests.map(async (r) => {
+        const paymentList = await storage.getPayments(r.id);
+        return { ...r, payment: paymentList.length > 0 ? paymentList[0] : undefined };
+      })
+    );
+
+    res.json(requestsWithPayments);
   });
 
-  // === Document Requests ===
-  app.get(api.documentRequests.list.path, async (req, res) => {
-    // In a real app, we'd filter by user unless admin. 
-    // For MVP, we'll try to get the current user context or return all if admin
-    const username = req.headers['x-replit-user-name'] as string;
-    const user = username ? await storage.getUserByUsername(username) : undefined;
-    
-    const requests = await storage.getDocumentRequests(user?.role === 'admin' ? undefined : user?.id);
-    res.json(requests);
-  });
-
-  app.post(api.documentRequests.create.path, async (req, res) => {
+  app.post(api.documentRequests.create.path, requireRole("student"), async (req, res) => {
     const input = api.documentRequests.create.input.parse(req.body);
-    const request = await storage.createDocumentRequest(input);
+    const request = await storage.createDocumentRequest({
+      ...input,
+      userId: req.user!.id,
+    });
     res.status(201).json(request);
   });
 
-  app.get(api.documentRequests.get.path, async (req, res) => {
+  app.get(api.documentRequests.get.path, requireRole("student", "admin"), async (req, res) => {
     const request = await storage.getDocumentRequest(Number(req.params.id));
     if (!request) return res.status(404).json({ message: "Not found" });
-    
-    const payments = await storage.getPayments(request.id);
-    const payment = payments.length > 0 ? payments[0] : undefined;
-    
+
+    const paymentList = await storage.getPayments(request.id);
+    const payment = paymentList.length > 0 ? paymentList[0] : undefined;
     res.json({ ...request, payment });
   });
 
-  // === Payments ===
-  app.post(api.payments.process.path, async (req, res) => {
+  app.patch(api.documentRequests.updateStatus.path, requireRole("admin"), async (req, res) => {
+    const { status, adminComment } = req.body;
+    const request = await storage.updateDocumentRequestStatus(Number(req.params.id), status, adminComment);
+    res.json(request);
+  });
+
+  app.post(api.payments.process.path, requireRole("student"), async (req, res) => {
     const { requestId, amount, method } = req.body;
-    // Mock payment processing
     const payment = await storage.createPayment({
       requestId,
       amount,
       method,
-      status: "paid", // Auto-success for MVP
+      status: "paid",
       transactionId: `TXN-${Date.now()}`
     });
+    await storage.updateDocumentRequestStatus(requestId, "pending_approval");
     res.json(payment);
   });
 
-  // === Petitions ===
-  app.get(api.petitions.list.path, async (req, res) => {
-    const username = req.headers['x-replit-user-name'] as string;
-    const user = username ? await storage.getUserByUsername(username) : undefined;
-    
-    if (!user) return res.status(401).json({ message: "Unauthorized" });
-    
+  app.get(api.petitions.list.path, requireRole("instructor", "admin"), async (req, res) => {
+    const user = req.user!;
     const petitions = await storage.getPetitions(user.role, user.id);
     res.json(petitions);
   });
 
-  app.post(api.petitions.create.path, async (req, res) => {
+  app.post(api.petitions.create.path, requireRole("instructor"), async (req, res) => {
     const input = api.petitions.create.input.parse(req.body);
-    const petition = await storage.createPetition(input);
+    const petition = await storage.createPetition({
+      ...input,
+      instructorId: req.user!.id,
+    });
     res.status(201).json(petition);
   });
 
-  app.patch(api.petitions.updateStatus.path, async (req, res) => {
-    const { status } = req.body;
-    const petition = await storage.updatePetitionStatus(Number(req.params.id), status);
+  app.patch(api.petitions.updateStatus.path, requireRole("admin"), async (req, res) => {
+    const { status, adminComment } = req.body;
+    const petition = await storage.updatePetitionStatus(Number(req.params.id), status, adminComment);
     res.json(petition);
   });
 
-  // === Major Applications ===
-  app.get(api.majorApplications.list.path, async (req, res) => {
-     const username = req.headers['x-replit-user-name'] as string;
-    const user = username ? await storage.getUserByUsername(username) : undefined;
-    
-    const apps = await storage.getMajorApplications(user?.role === 'admin' ? undefined : user?.id);
+  app.get(api.majorApplications.list.path, requireRole("student", "admin"), async (req, res) => {
+    const user = req.user!;
+    const apps = await storage.getMajorApplications(user.role === 'admin' ? undefined : user.id);
     res.json(apps);
   });
 
-  app.post(api.majorApplications.create.path, async (req, res) => {
+  app.post(api.majorApplications.create.path, requireRole("student"), async (req, res) => {
     const input = api.majorApplications.create.input.parse(req.body);
-    const appData = await storage.createMajorApplication(input);
+    const appData = await storage.createMajorApplication({
+      ...input,
+      studentId: req.user!.id,
+    });
     res.status(201).json(appData);
   });
 
-  // === Calendar ===
-  app.get(api.calendar.list.path, async (req, res) => {
+  app.patch(api.majorApplications.updateStatus.path, requireRole("admin"), async (req, res) => {
+    const { status, adminComment } = req.body;
+    const appData = await storage.updateMajorApplicationStatus(Number(req.params.id), status, adminComment);
+    res.json(appData);
+  });
+
+  app.get(api.calendar.list.path, requireAuth, async (req, res) => {
     const events = await storage.getCalendarEvents();
     res.json(events);
   });
 
-  app.post(api.calendar.create.path, async (req, res) => {
+  app.post(api.calendar.create.path, requireRole("admin"), async (req, res) => {
     const input = api.calendar.create.input.parse(req.body);
-    const event = await storage.createCalendarEvent(input);
+    const event = await storage.createCalendarEvent({
+      ...input,
+      createdBy: req.user!.id,
+    });
     res.status(201).json(event);
   });
+
+  await seedDatabase();
 
   return httpServer;
 }
 
-// Seed function
 async function seedDatabase() {
-  const events = await storage.getCalendarEvents();
-  if (events.length === 0) {
-    await storage.createCalendarEvent({
-      title: "Fall Semester Starts",
-      startDate: new Date("2024-09-01"),
-      type: "event",
-      description: "First day of classes"
-    });
-     await storage.createCalendarEvent({
-      title: "Midterm Exams",
-      startDate: new Date("2024-10-15"),
-      endDate: new Date("2024-10-25"),
-      type: "exam",
-      description: "Midterm examination period"
-    });
-  }
+  const existingAdmin = await storage.getUserByUsername("admin");
+  if (existingAdmin) return;
+
+  const adminHash = await hashPassword("admin123");
+  const studentHash = await hashPassword("student123");
+  const instructorHash = await hashPassword("instructor123");
+
+  await storage.createUser({
+    username: "admin",
+    email: "admin@lums.edu.pk",
+    passwordHash: adminHash,
+    firstName: "System",
+    lastName: "Administrator",
+    fullName: "System Administrator",
+    role: "admin",
+    isActive: true,
+    department: "Registrar Office",
+  });
+
+  await storage.createUser({
+    username: "student",
+    email: "student@lums.edu.pk",
+    passwordHash: studentHash,
+    firstName: "Ahmed",
+    lastName: "Khan",
+    fullName: "Ahmed Khan",
+    role: "student",
+    isActive: true,
+    studentId: "24100001",
+    department: "SSE",
+  });
+
+  await storage.createUser({
+    username: "instructor",
+    email: "instructor@lums.edu.pk",
+    passwordHash: instructorHash,
+    firstName: "Dr. Sarah",
+    lastName: "Ali",
+    fullName: "Dr. Sarah Ali",
+    role: "instructor",
+    isActive: true,
+    department: "SSE",
+  });
+
+  await storage.createCalendarEvent({
+    title: "Fall Semester Starts",
+    startDate: new Date("2026-09-01"),
+    type: "event",
+    description: "First day of classes for Fall 2026"
+  });
+  await storage.createCalendarEvent({
+    title: "Midterm Examinations",
+    startDate: new Date("2026-10-15"),
+    endDate: new Date("2026-10-25"),
+    type: "exam",
+    description: "Midterm examination period"
+  });
+  await storage.createCalendarEvent({
+    title: "Spring Break",
+    startDate: new Date("2026-03-23"),
+    endDate: new Date("2026-03-27"),
+    type: "holiday",
+    description: "Spring break - No classes"
+  });
+  await storage.createCalendarEvent({
+    title: "Course Registration Deadline",
+    startDate: new Date("2026-02-15"),
+    type: "deadline",
+    description: "Last day to add/drop courses without penalty"
+  });
 }

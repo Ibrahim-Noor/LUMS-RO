@@ -6,17 +6,15 @@ import type {
   InsertPetition, 
   InsertMajorApplication, 
   InsertCalendarEvent,
-  InsertPayment
 } from "@shared/schema";
 
-// === DOCUMENT REQUESTS ===
 export function useDocumentRequests() {
   return useQuery({
     queryKey: [api.documentRequests.list.path],
     queryFn: async () => {
       const res = await fetch(api.documentRequests.list.path, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch requests");
-      return api.documentRequests.list.responses[200].parse(await res.json());
+      return res.json();
     },
   });
 }
@@ -25,7 +23,7 @@ export function useCreateDocumentRequest() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async (data: InsertDocumentRequest) => {
+    mutationFn: async (data: Partial<InsertDocumentRequest>) => {
       const res = await fetch(api.documentRequests.create.path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -33,7 +31,7 @@ export function useCreateDocumentRequest() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to create request");
-      return api.documentRequests.create.responses[201].parse(await res.json());
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.documentRequests.list.path] });
@@ -45,7 +43,6 @@ export function useCreateDocumentRequest() {
   });
 }
 
-// === PAYMENTS ===
 export function useProcessPayment() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -58,7 +55,7 @@ export function useProcessPayment() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Payment failed");
-      return api.payments.process.responses[200].parse(await res.json());
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.documentRequests.list.path] });
@@ -70,14 +67,35 @@ export function useProcessPayment() {
   });
 }
 
-// === PETITIONS ===
+export function useUpdateDocumentRequestStatus() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ id, status, adminComment }: { id: number, status: string, adminComment?: string }) => {
+      const url = buildUrl(api.documentRequests.updateStatus.path, { id });
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, adminComment }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update status");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.documentRequests.list.path] });
+      toast({ title: "Status Updated", description: "Request status has been changed." });
+    },
+  });
+}
+
 export function usePetitions() {
   return useQuery({
     queryKey: [api.petitions.list.path],
     queryFn: async () => {
       const res = await fetch(api.petitions.list.path, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch petitions");
-      return api.petitions.list.responses[200].parse(await res.json());
+      return res.json();
     },
   });
 }
@@ -86,7 +104,7 @@ export function useCreatePetition() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async (data: InsertPetition) => {
+    mutationFn: async (data: Partial<InsertPetition>) => {
       const res = await fetch(api.petitions.create.path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -94,11 +112,11 @@ export function useCreatePetition() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to submit petition");
-      return api.petitions.create.responses[201].parse(await res.json());
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.petitions.list.path] });
-      toast({ title: "Petition Submitted", description: "Your grade change petition has been forwarded." });
+      toast({ title: "Petition Submitted", description: "Your grade change petition has been submitted for review." });
     },
   });
 }
@@ -107,32 +125,31 @@ export function useUpdatePetitionStatus() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async ({ id, status }: { id: number, status: string }) => {
+    mutationFn: async ({ id, status, adminComment }: { id: number, status: string, adminComment?: string }) => {
       const url = buildUrl(api.petitions.updateStatus.path, { id });
       const res = await fetch(url, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, adminComment }),
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to update status");
-      return api.petitions.updateStatus.responses[200].parse(await res.json());
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.petitions.list.path] });
-      toast({ title: "Status Updated", description: "Petition status has been changed successfully." });
+      toast({ title: "Status Updated", description: "Petition status has been changed." });
     },
   });
 }
 
-// === MAJOR APPLICATIONS ===
 export function useMajorApplications() {
   return useQuery({
     queryKey: [api.majorApplications.list.path],
     queryFn: async () => {
       const res = await fetch(api.majorApplications.list.path, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch applications");
-      return api.majorApplications.list.responses[200].parse(await res.json());
+      return res.json();
     },
   });
 }
@@ -141,7 +158,7 @@ export function useCreateMajorApplication() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async (data: InsertMajorApplication) => {
+    mutationFn: async (data: Partial<InsertMajorApplication>) => {
       const res = await fetch(api.majorApplications.create.path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -149,7 +166,7 @@ export function useCreateMajorApplication() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to submit application");
-      return api.majorApplications.create.responses[201].parse(await res.json());
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.majorApplications.list.path] });
@@ -158,14 +175,35 @@ export function useCreateMajorApplication() {
   });
 }
 
-// === CALENDAR ===
+export function useUpdateMajorApplicationStatus() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ id, status, adminComment }: { id: number, status: string, adminComment?: string }) => {
+      const url = buildUrl(api.majorApplications.updateStatus.path, { id });
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, adminComment }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update status");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.majorApplications.list.path] });
+      toast({ title: "Status Updated", description: "Application status has been changed." });
+    },
+  });
+}
+
 export function useCalendarEvents() {
   return useQuery({
     queryKey: [api.calendar.list.path],
     queryFn: async () => {
       const res = await fetch(api.calendar.list.path, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch calendar");
-      return api.calendar.list.responses[200].parse(await res.json());
+      return res.json();
     },
   });
 }
@@ -182,7 +220,7 @@ export function useCreateCalendarEvent() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to create event");
-      return api.calendar.create.responses[201].parse(await res.json());
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.calendar.list.path] });
