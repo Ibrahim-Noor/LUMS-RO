@@ -27,7 +27,7 @@ export const documentRequestsRelations = relations(documentRequests, ({ one }) =
   }),
 }));
 
-export const insertDocumentRequestSchema = createInsertSchema(documentRequests).omit({ id: true, createdAt: true, updatedAt: true, status: true, adminComment: true });
+export const insertDocumentRequestSchema = createInsertSchema(documentRequests).omit({ id: true, createdAt: true, updatedAt: true, status: true, adminComment: true, userId: true });
 
 export const payments = pgTable("payments", {
   id: serial("id").primaryKey(),
@@ -70,7 +70,7 @@ export const petitionsRelations = relations(gradeChangePetitions, ({ one }) => (
   }),
 }));
 
-export const insertPetitionSchema = createInsertSchema(gradeChangePetitions).omit({ id: true, createdAt: true, updatedAt: true, status: true, adminComment: true });
+export const insertPetitionSchema = createInsertSchema(gradeChangePetitions).omit({ id: true, createdAt: true, updatedAt: true, status: true, adminComment: true, instructorId: true });
 
 export const majorApplications = pgTable("major_applications", {
   id: serial("id").primaryKey(),
@@ -91,7 +91,7 @@ export const majorApplicationsRelations = relations(majorApplications, ({ one })
   }),
 }));
 
-export const insertMajorApplicationSchema = createInsertSchema(majorApplications).omit({ id: true, createdAt: true, status: true, adminComment: true });
+export const insertMajorApplicationSchema = createInsertSchema(majorApplications).omit({ id: true, createdAt: true, status: true, adminComment: true, studentId: true });
 
 export const calendarEvents = pgTable("calendar_events", {
   id: serial("id").primaryKey(),
