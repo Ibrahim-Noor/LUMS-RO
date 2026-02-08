@@ -11,7 +11,7 @@ export const documentRequests = pgTable("document_requests", {
   userId: varchar("user_id").notNull(),
   type: text("type", { enum: ["transcript", "degree", "letter", "duplicate_degree"] }).notNull(),
   urgency: text("urgency", { enum: ["normal", "urgent"] }).default("normal").notNull(),
-  status: text("status", { enum: ["submitted", "payment_pending", "pending_approval", "approved", "completed", "rejected"] }).default("submitted").notNull(),
+  status: text("status", { enum: ["submitted", "payment_pending", "pending_approval", "approved", "completed", "rejected"] }).default("payment_pending").notNull(),
   copies: integer("copies").default(1).notNull(),
   amount: integer("amount"),
   details: jsonb("details"),
