@@ -1,27 +1,16 @@
 
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, check } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, check, varchar } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { users } from "./models/auth";
 
-// === USERS & ROLES ===
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(), // Corresponds to Replit Auth username or email
-  email: text("email").notNull(),
-  fullName: text("full_name").notNull(),
-  role: text("role", { enum: ["student", "alumni", "faculty", "staff", "admin"] }).default("student").notNull(),
-  studentId: text("student_id"), // Nullable for staff/faculty
-  department: text("department"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
+export * from "./models/auth";
 
 // === DOCUMENT REQUESTS ===
 export const documentRequests = pgTable("document_requests", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: varchar("user_id").notNull(), // Changed to varchar to match users.id
   type: text("type", { enum: ["transcript", "degree", "letter", "duplicate_degree"] }).notNull(),
   urgency: text("urgency", { enum: ["normal", "urgent"] }).default("normal").notNull(),
   status: text("status", { enum: ["pending", "processing", "completed", "rejected"] }).default("pending").notNull(),
@@ -63,8 +52,8 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true,
 // === GRADE CHANGE PETITIONS ===
 export const gradeChangePetitions = pgTable("grade_change_petitions", {
   id: serial("id").primaryKey(),
-  studentId: integer("student_id").notNull(),
-  instructorId: integer("instructor_id").notNull(),
+  studentId: varchar("student_id").notNull(), // Changed to varchar
+  instructorId: varchar("instructor_id").notNull(), // Changed to varchar
   courseCode: text("course_code").notNull(),
   semester: text("semester").notNull(),
   currentGrade: text("current_grade").notNull(),
@@ -93,7 +82,7 @@ export const insertPetitionSchema = createInsertSchema(gradeChangePetitions).omi
 // === MAJOR DECLARATIONS ===
 export const majorApplications = pgTable("major_applications", {
   id: serial("id").primaryKey(),
-  studentId: integer("student_id").notNull(),
+  studentId: varchar("student_id").notNull(), // Changed to varchar
   currentMajor: text("current_major"),
   requestedMajor: text("requested_major").notNull(),
   school: text("school").notNull(), // SSE, SDSB, HSS, etc.
@@ -126,6 +115,9 @@ export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit
 
 // === TYPES ===
 export type User = typeof users.$inferSelect;
+// Manually define InsertUser to avoid circular dependency or issues with createInsertSchema on external table if needed
+// But createInsertSchema(users) should work if imported
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export type DocumentRequest = typeof documentRequests.$inferSelect;

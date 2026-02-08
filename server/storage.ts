@@ -13,13 +13,13 @@ import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Users
-  getUser(id: number): Promise<User | undefined>;
+  getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  updateUser(id: number, updates: Partial<InsertUser>): Promise<User>;
+  updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
 
   // Document Requests
-  getDocumentRequests(userId?: number): Promise<DocumentRequest[]>;
+  getDocumentRequests(userId?: string): Promise<DocumentRequest[]>;
   getDocumentRequest(id: number): Promise<DocumentRequest | undefined>;
   createDocumentRequest(req: InsertDocumentRequest): Promise<DocumentRequest>;
 
@@ -28,12 +28,12 @@ export interface IStorage {
   createPayment(payment: InsertPayment): Promise<Payment>;
 
   // Petitions
-  getPetitions(role: string, userId: number): Promise<Petition[]>; // Filter by role logic
+  getPetitions(role: string, userId: string): Promise<Petition[]>; // Filter by role logic
   createPetition(petition: InsertPetition): Promise<Petition>;
   updatePetitionStatus(id: number, status: string): Promise<Petition>;
 
   // Major Applications
-  getMajorApplications(userId?: number): Promise<MajorApplication[]>;
+  getMajorApplications(userId?: string): Promise<MajorApplication[]>;
   createMajorApplication(app: InsertMajorApplication): Promise<MajorApplication>;
 
   // Calendar
@@ -43,7 +43,7 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   // Users
-  async getUser(id: number): Promise<User | undefined> {
+  async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
@@ -58,13 +58,13 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUser(id: number, updates: Partial<InsertUser>): Promise<User> {
+  async updateUser(id: string, updates: Partial<InsertUser>): Promise<User> {
     const [user] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
     return user;
   }
 
   // Document Requests
-  async getDocumentRequests(userId?: number): Promise<DocumentRequest[]> {
+  async getDocumentRequests(userId?: string): Promise<DocumentRequest[]> {
     if (userId) {
       return await db.select().from(documentRequests).where(eq(documentRequests.userId, userId)).orderBy(desc(documentRequests.createdAt));
     }
@@ -92,7 +92,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Petitions
-  async getPetitions(role: string, userId: number): Promise<Petition[]> {
+  async getPetitions(role: string, userId: string): Promise<Petition[]> {
     if (role === 'student') {
       return await db.select().from(gradeChangePetitions).where(eq(gradeChangePetitions.studentId, userId));
     } else if (role === 'faculty') {
@@ -114,7 +114,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Major Applications
-  async getMajorApplications(userId?: number): Promise<MajorApplication[]> {
+  async getMajorApplications(userId?: string): Promise<MajorApplication[]> {
     if (userId) {
       return await db.select().from(majorApplications).where(eq(majorApplications.studentId, userId));
     }
