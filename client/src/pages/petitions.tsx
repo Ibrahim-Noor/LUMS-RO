@@ -44,9 +44,12 @@ export default function Petitions() {
   });
 
   async function onSubmit(data: z.infer<typeof formSchema>) {
-    await createPetition.mutateAsync(data);
-    setOpen(false);
-    form.reset();
+    try {
+      await createPetition.mutateAsync(data);
+      setOpen(false);
+      form.reset();
+    } catch {
+    }
   }
 
   async function handleAdminAction(id: number, status: string) {
