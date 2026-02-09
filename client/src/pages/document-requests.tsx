@@ -192,7 +192,7 @@ export default function DocumentRequests() {
                     </div>
                   )}
                   
-                  {isStudent && !request.payment && request.status === "submitted" && (
+                  {isStudent && !request.payment && (request.status === "submitted" || request.status === "payment_pending") && (
                     <Button 
                       size="sm" 
                       variant="outline"
