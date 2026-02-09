@@ -20,7 +20,7 @@ const formSchema = z.object({
   courseCode: z.string().min(1, "Course code is required"),
   currentGrade: z.string().min(1, "Current grade is required"),
   newGrade: z.string().min(1, "New grade is required"),
-  justification: z.string().min(100, "Justification must be at least 100 characters"),
+  justification: z.string().min(1, "Justification is required"),
 });
 
 export default function Petitions() {
@@ -167,7 +167,7 @@ export default function Petitions() {
                     name="justification"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Justification (min 100 chars)</FormLabel>
+                        <FormLabel>Justification</FormLabel>
                         <FormControl>
                           <Textarea 
                             placeholder="Explain why the grade change is justified..." 
