@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import LayoutShell from "@/components/layout-shell";
 import { useAuth } from "@/hooks/use-auth";
 import { useMajorApplications, useCreateMajorApplication, useUpdateMajorApplicationStatus } from "@/hooks/use-registrar";
@@ -31,6 +31,14 @@ export default function MajorApplications() {
   const [rejectDialogId, setRejectDialogId] = useState<number | null>(null);
   const [adminComment, setAdminComment] = useState("");
 
+  const currentMajor = useMemo(() => {
+    if (!applications || applications.length === 0) return "Undeclared";
+    const approved = applications
+      .filter((app: any) => app.status === "approved")
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return approved.length > 0 ? approved[0].requestedMajor : "Undeclared";
+  }, [applications]);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -41,10 +49,14 @@ export default function MajorApplications() {
     },
   });
 
+  useEffect(() => {
+    form.setValue("currentMajor", currentMajor);
+  }, [currentMajor, form]);
+
   async function onSubmit(data: z.infer<typeof formSchema>) {
     await createApplication.mutateAsync(data);
     setOpen(false);
-    form.reset();
+    form.reset({ currentMajor, requestedMajor: "", school: "", statement: "" });
   }
 
   async function handleAdminAction(id: number, status: string) {
