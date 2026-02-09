@@ -35,10 +35,12 @@ def create_petition(current_user=None):
     pending_statuses = ['submitted', 'pending_approval']
     existing_pending = GradeChangePetition.query.filter(
         GradeChangePetition.instructor_id == current_user.id,
+        GradeChangePetition.student_id == data['studentId'],
+        GradeChangePetition.course_code == data['courseCode'],
         GradeChangePetition.status.in_(pending_statuses)
     ).first()
     if existing_pending:
-        return jsonify({'message': 'You already have a pending grade change petition. Please wait until it is approved or rejected before submitting a new one.'}), 400
+        return jsonify({'message': 'You already have a pending petition for this student and course. Please wait until it is resolved before submitting another.'}), 400
 
     petition = GradeChangePetition(
         instructor_id=current_user.id,
