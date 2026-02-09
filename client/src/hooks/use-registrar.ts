@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest, getAccessToken } from "@/lib/queryClient";
 import { api, buildUrl } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import type { 
@@ -8,11 +9,20 @@ import type {
   InsertCalendarEvent,
 } from "@shared/schema";
 
+function authFetch(url: string) {
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return fetch(url, { headers });
+}
+
 export function useDocumentRequests() {
   return useQuery({
     queryKey: [api.documentRequests.list.path],
     queryFn: async () => {
-      const res = await fetch(api.documentRequests.list.path, { credentials: "include" });
+      const res = await authFetch(api.documentRequests.list.path);
       if (!res.ok) throw new Error("Failed to fetch requests");
       return res.json();
     },
@@ -24,13 +34,7 @@ export function useCreateDocumentRequest() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: async (data: Partial<InsertDocumentRequest>) => {
-      const res = await fetch(api.documentRequests.create.path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to create request");
+      const res = await apiRequest("POST", api.documentRequests.create.path, data);
       return res.json();
     },
     onSuccess: () => {
@@ -48,13 +52,7 @@ export function useProcessPayment() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: async (data: { requestId: number, amount: number, method: "online" | "voucher" }) => {
-      const res = await fetch(api.payments.process.path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Payment failed");
+      const res = await apiRequest("POST", api.payments.process.path, data);
       return res.json();
     },
     onSuccess: () => {
@@ -73,13 +71,7 @@ export function useUpdateDocumentRequestStatus() {
   return useMutation({
     mutationFn: async ({ id, status, adminComment }: { id: number, status: string, adminComment?: string }) => {
       const url = buildUrl(api.documentRequests.updateStatus.path, { id });
-      const res = await fetch(url, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, adminComment }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to update status");
+      const res = await apiRequest("PATCH", url, { status, adminComment });
       return res.json();
     },
     onSuccess: () => {
@@ -93,7 +85,7 @@ export function usePetitions() {
   return useQuery({
     queryKey: [api.petitions.list.path],
     queryFn: async () => {
-      const res = await fetch(api.petitions.list.path, { credentials: "include" });
+      const res = await authFetch(api.petitions.list.path);
       if (!res.ok) throw new Error("Failed to fetch petitions");
       return res.json();
     },
@@ -105,13 +97,7 @@ export function useCreatePetition() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: async (data: Partial<InsertPetition>) => {
-      const res = await fetch(api.petitions.create.path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to submit petition");
+      const res = await apiRequest("POST", api.petitions.create.path, data);
       return res.json();
     },
     onSuccess: () => {
@@ -127,13 +113,7 @@ export function useUpdatePetitionStatus() {
   return useMutation({
     mutationFn: async ({ id, status, adminComment }: { id: number, status: string, adminComment?: string }) => {
       const url = buildUrl(api.petitions.updateStatus.path, { id });
-      const res = await fetch(url, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, adminComment }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to update status");
+      const res = await apiRequest("PATCH", url, { status, adminComment });
       return res.json();
     },
     onSuccess: () => {
@@ -147,7 +127,7 @@ export function useMajorApplications() {
   return useQuery({
     queryKey: [api.majorApplications.list.path],
     queryFn: async () => {
-      const res = await fetch(api.majorApplications.list.path, { credentials: "include" });
+      const res = await authFetch(api.majorApplications.list.path);
       if (!res.ok) throw new Error("Failed to fetch applications");
       return res.json();
     },
@@ -159,13 +139,7 @@ export function useCreateMajorApplication() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: async (data: Partial<InsertMajorApplication>) => {
-      const res = await fetch(api.majorApplications.create.path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to submit application");
+      const res = await apiRequest("POST", api.majorApplications.create.path, data);
       return res.json();
     },
     onSuccess: () => {
@@ -181,13 +155,7 @@ export function useUpdateMajorApplicationStatus() {
   return useMutation({
     mutationFn: async ({ id, status, adminComment }: { id: number, status: string, adminComment?: string }) => {
       const url = buildUrl(api.majorApplications.updateStatus.path, { id });
-      const res = await fetch(url, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, adminComment }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to update status");
+      const res = await apiRequest("PATCH", url, { status, adminComment });
       return res.json();
     },
     onSuccess: () => {
@@ -201,7 +169,7 @@ export function useCalendarEvents() {
   return useQuery({
     queryKey: [api.calendar.list.path],
     queryFn: async () => {
-      const res = await fetch(api.calendar.list.path, { credentials: "include" });
+      const res = await authFetch(api.calendar.list.path);
       if (!res.ok) throw new Error("Failed to fetch calendar");
       return res.json();
     },
@@ -213,13 +181,7 @@ export function useCreateCalendarEvent() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: async (data: InsertCalendarEvent) => {
-      const res = await fetch(api.calendar.create.path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to create event");
+      const res = await apiRequest("POST", api.calendar.create.path, data);
       return res.json();
     },
     onSuccess: () => {

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, setAccessToken, getAccessToken } from "@/lib/queryClient";
 
 type AuthUser = {
   id: string;
@@ -17,11 +17,19 @@ type AuthUser = {
 };
 
 async function fetchUser(): Promise<AuthUser | null> {
+  const token = getAccessToken();
+  if (!token) {
+    return null;
+  }
+
   const response = await fetch("/api/auth/user", {
-    credentials: "include",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   if (response.status === 401) {
+    setAccessToken(null);
     return null;
   }
 
@@ -45,16 +53,19 @@ export function useAuth() {
   const loginMutation = useMutation({
     mutationFn: async (credentials: { username: string; password: string }) => {
       const res = await apiRequest("POST", "/api/auth/login", credentials);
-      return res.json();
+      const data = await res.json();
+      setAccessToken(data.access_token);
+      return data.user;
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(["/api/auth/user"], data);
+    onSuccess: (userData) => {
+      queryClient.setQueryData(["/api/auth/user"], userData);
     },
   });
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/auth/logout");
+      setAccessToken(null);
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/auth/user"], null);

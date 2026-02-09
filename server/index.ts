@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { spawn } from "child_process";
 
 const app = express();
 const httpServer = createServer(app);
@@ -11,16 +12,6 @@ declare module "http" {
     rawBody: unknown;
   }
 }
-
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  }),
-);
-
-app.use(express.urlencoded({ extended: false }));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -85,10 +76,29 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  const flaskProcess = spawn("python", ["run.py"], {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env },
+  });
+
+  flaskProcess.stdout?.on("data", (data: Buffer) => {
+    log(data.toString().trim(), "flask");
+  });
+
+  flaskProcess.stderr?.on("data", (data: Buffer) => {
+    log(data.toString().trim(), "flask");
+  });
+
+  flaskProcess.on("exit", (code: number | null) => {
+    log(`Flask process exited with code ${code}`, "flask");
+  });
+
+  process.on("exit", () => {
+    flaskProcess.kill();
+  });
+
+  await new Promise<void>((resolve) => setTimeout(resolve, 2000));
+
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {
