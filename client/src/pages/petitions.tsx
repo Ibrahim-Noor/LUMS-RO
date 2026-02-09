@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import LayoutShell from "@/components/layout-shell";
 import { useAuth } from "@/hooks/use-auth";
 import { usePetitions, useCreatePetition, useUpdatePetitionStatus } from "@/hooks/use-registrar";
@@ -11,7 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { StatusBadge } from "@/components/status-badge";
-import { GraduationCap, ArrowRight, Loader2, Plus, CheckCircle, XCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { GraduationCap, ArrowRight, Loader2, Plus, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { z } from "zod";
 
 const formSchema = z.object({
@@ -57,6 +58,12 @@ export default function Petitions() {
   const isInstructor = user?.role === "instructor";
   const isAdmin = user?.role === "admin";
 
+  const hasPendingPetition = useMemo(() => {
+    if (!petitions) return false;
+    const pendingStatuses = ["submitted", "pending_approval"];
+    return petitions.some((p: any) => pendingStatuses.includes(p.status));
+  }, [petitions]);
+
   return (
     <LayoutShell>
       <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
@@ -68,6 +75,21 @@ export default function Petitions() {
         </div>
         
         {isInstructor && (
+          hasPendingPetition ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button disabled data-testid="button-new-petition">
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                    New Petition
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>You have a pending petition. Wait until it's resolved.</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-new-petition">
@@ -168,6 +190,7 @@ export default function Petitions() {
               </Form>
             </DialogContent>
           </Dialog>
+          )
         )}
       </div>
 

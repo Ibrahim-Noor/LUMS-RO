@@ -41,6 +41,14 @@ def create_document_request(current_user=None):
     if urgency not in ['normal', 'urgent']:
         return jsonify({'message': 'Invalid urgency'}), 400
 
+    pending_statuses = ['submitted', 'payment_pending', 'pending_approval']
+    existing_pending = DocumentRequest.query.filter(
+        DocumentRequest.user_id == current_user.id,
+        DocumentRequest.status.in_(pending_statuses)
+    ).first()
+    if existing_pending:
+        return jsonify({'message': 'You already have a pending document request. Please wait until it is approved or rejected before submitting a new one.'}), 400
+
     copies = data.get('copies', 1)
     amount = data.get('amount')
     details = data.get('details')

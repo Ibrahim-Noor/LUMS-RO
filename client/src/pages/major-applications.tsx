@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { StatusBadge } from "@/components/status-badge";
-import { Building2, Loader2, Plus, ArrowRight, CheckCircle, XCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Building2, Loader2, Plus, ArrowRight, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { z } from "zod";
 
 const formSchema = z.object({
@@ -68,6 +69,12 @@ export default function MajorApplications() {
   const isStudent = user?.role === "student";
   const isAdmin = user?.role === "admin";
 
+  const hasPendingApplication = useMemo(() => {
+    if (!applications) return false;
+    const pendingStatuses = ["submitted", "pending_approval"];
+    return applications.some((a: any) => pendingStatuses.includes(a.status));
+  }, [applications]);
+
   return (
     <LayoutShell>
       <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
@@ -79,6 +86,21 @@ export default function MajorApplications() {
         </div>
         
         {isStudent && (
+          hasPendingApplication ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button disabled data-testid="button-declare-major">
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                    Declare Major
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>You have a pending declaration. Wait until it's resolved.</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-declare-major">
@@ -179,6 +201,7 @@ export default function MajorApplications() {
               </Form>
             </DialogContent>
           </Dialog>
+          )
         )}
       </div>
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import LayoutShell from "@/components/layout-shell";
 import { useAuth } from "@/hooks/use-auth";
 import { useDocumentRequests, useCreateDocumentRequest, useProcessPayment, useUpdateDocumentRequestStatus } from "@/hooks/use-registrar";
@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { StatusBadge } from "@/components/status-badge";
-import { FileText, CreditCard, Plus, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { FileText, CreditCard, Plus, Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { z } from "zod";
 
 const formSchema = z.object({
@@ -55,6 +56,12 @@ export default function DocumentRequests() {
   const isStudent = user?.role === "student";
   const isAdmin = user?.role === "admin";
 
+  const hasPendingRequest = useMemo(() => {
+    if (!requests) return false;
+    const pendingStatuses = ["submitted", "payment_pending", "pending_approval"];
+    return requests.some((r: any) => pendingStatuses.includes(r.status));
+  }, [requests]);
+
   return (
     <LayoutShell>
       <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
@@ -66,6 +73,21 @@ export default function DocumentRequests() {
         </div>
         
         {isStudent && (
+          hasPendingRequest ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button disabled data-testid="button-new-request">
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                    New Request
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>You have a pending request. Wait until it's resolved.</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-new-request">
@@ -149,6 +171,7 @@ export default function DocumentRequests() {
               </Form>
             </DialogContent>
           </Dialog>
+          )
         )}
       </div>
 

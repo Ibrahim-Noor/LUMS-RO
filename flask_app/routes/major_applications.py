@@ -28,6 +28,30 @@ def create_major_application(current_user=None):
     if not data.get('requestedMajor') or not data.get('school'):
         return jsonify({'message': 'requestedMajor and school are required'}), 400
 
+    pending_statuses = ['submitted', 'pending_approval']
+    existing_pending = MajorApplication.query.filter(
+        MajorApplication.student_id == current_user.id,
+        MajorApplication.status.in_(pending_statuses)
+    ).first()
+    if existing_pending:
+        return jsonify({'message': 'You already have a pending major declaration. Please wait until it is approved or rejected before submitting a new one.'}), 400
+
+    latest_approved = MajorApplication.query.filter(
+        MajorApplication.student_id == current_user.id,
+        MajorApplication.status == 'approved'
+    ).order_by(MajorApplication.created_at.desc()).first()
+
+    current_school = None
+    current_major_name = "Undeclared"
+    if latest_approved:
+        current_school = latest_approved.school
+        current_major_name = latest_approved.requested_major
+
+    requested_school = data['school']
+    requested_major = data['requestedMajor']
+    if current_school and current_school == requested_school and current_major_name == requested_major:
+        return jsonify({'message': f'You are already declared as {requested_major} in {requested_school}. Please choose a different major or school.'}), 400
+
     application = MajorApplication(
         student_id=current_user.id,
         current_major=data.get('currentMajor'),
