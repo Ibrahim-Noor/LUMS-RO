@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token, get_jwt_identity, verify_jwt_in_request
+from flask_jwt_extended import create_access_token, get_jwt_identity, verify_jwt_in_request, jwt_required
 from flask_app import db, bcrypt
 from flask_app.models import User
 from flask_app.decorators import jwt_required_with_user
@@ -40,6 +40,17 @@ def login():
 @jwt_required_with_user
 def get_current_user(current_user=None):
     return jsonify(current_user.to_dict()), 200
+
+
+@auth_bp.route('/refresh', methods=['POST'])
+@jwt_required()
+def refresh_token():
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    if not user or not user.is_active:
+        return jsonify({'message': 'User not found or inactive'}), 401
+    new_token = create_access_token(identity=user.id)
+    return jsonify({'access_token': new_token}), 200
 
 
 @auth_bp.route('/logout', methods=['POST'])
