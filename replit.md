@@ -5,16 +5,18 @@ Web application for managing academic administrative processes at LUMS including
 
 ## Architecture
 - **Frontend**: React 18 + Vite + TypeScript + TailwindCSS + shadcn/ui
-- **Backend**: Express.js + TypeScript
-- **Database**: PostgreSQL (Neon-backed) via Drizzle ORM
-- **Auth**: Username/password with passport-local + bcrypt (session-based)
-- **Routing**: wouter (frontend), Express (backend)
+- **Backend**: Flask 3.0 (Python) with SQLAlchemy ORM + JWT authentication
+- **Proxy**: Express.js serves frontend via Vite and proxies /api/* to Flask on port 5001
+- **Database**: PostgreSQL (Neon-backed) via SQLAlchemy
+- **Auth**: JWT tokens (Flask-JWT-Extended) with localStorage persistence
+- **Routing**: wouter (frontend), Flask Blueprints (backend API)
 
 ## Authentication System (Updated Feb 2026)
-- Switched from Replit Auth to username/password authentication
-- Uses passport-local strategy with bcrypt password hashing (12 rounds)
-- Session-based auth with connect-pg-simple session store
+- Flask backend with JWT token-based authentication (Flask-JWT-Extended)
+- Tokens stored in localStorage, sent via Authorization: Bearer header
+- 30-minute token expiry
 - 3 roles: Student, Instructor, Admin
+- role_required decorator for route protection
 
 ### Demo Credentials
 | Role | Username | Password |
@@ -29,16 +31,40 @@ Web application for managing academic administrative processes at LUMS including
 - **Admin**: All features + Approve/Reject capabilities + Calendar management
 
 ## Key Files
-- `shared/schema.ts` - Database schema (Drizzle ORM)
-- `shared/models/auth.ts` - User & session table definitions
-- `shared/routes.ts` - API contract definitions
-- `server/auth.ts` - Authentication setup (passport-local, bcrypt)
-- `server/routes.ts` - API route handlers + seed data
-- `server/storage.ts` - Database CRUD operations
+- `flask_app/__init__.py` - Flask app factory with JWT setup
+- `flask_app/models.py` - SQLAlchemy models (User, DocumentRequest, Payment, etc.)
+- `flask_app/decorators.py` - role_required decorator for route protection
+- `flask_app/seed.py` - Database seeding (demo users + sample data)
+- `flask_app/routes/auth.py` - JWT auth endpoints (login, logout, user)
+- `flask_app/routes/document_requests.py` - Document request CRUD
+- `flask_app/routes/petitions.py` - Grade change petition CRUD
+- `flask_app/routes/major_applications.py` - Major application CRUD
+- `flask_app/routes/calendar.py` - Calendar events CRUD
+- `flask_app/routes/payments.py` - Payment processing
+- `flask_app/routes/notifications.py` - User notifications
+- `run.py` - Flask app entry point (port 5001)
+- `server/index.ts` - Express server (port 5000) + Flask child process + Vite
+- `server/routes.ts` - Express proxy routes to Flask
+- `client/src/lib/queryClient.ts` - JWT token management + API request helper
 - `client/src/hooks/use-auth.ts` - Auth hook (login/logout/user)
 - `client/src/hooks/use-registrar.ts` - Data fetching hooks
 - `client/src/components/layout-shell.tsx` - Main layout with role-based nav
 - `client/src/pages/` - All page components
+
+## API Routes (Flask)
+- POST /api/auth/login - Login, returns JWT token
+- POST /api/auth/logout - Logout (client-side token removal)
+- GET /api/auth/user - Get current user from JWT
+- GET/POST /api/document-requests - Document request CRUD
+- PATCH /api/document-requests/:id/status - Update document request status
+- GET/POST /api/petitions - Grade change petition CRUD
+- PATCH /api/petitions/:id/status - Update petition status
+- GET/POST /api/major-applications - Major application CRUD
+- PATCH /api/major-applications/:id/status - Update application status
+- GET/POST /api/calendar - Calendar events CRUD
+- GET/POST /api/payments - Payment CRUD
+- GET /api/notifications - User notifications
+- PATCH /api/notifications/:id/read - Mark notification as read
 
 ## Approval Workflow
 - Students/Instructors submit requests
@@ -48,14 +74,19 @@ Web application for managing academic administrative processes at LUMS including
   - Grade Petitions: submitted → pending_approval → approved/rejected
   - Major Applications: submitted → pending_approval → approved/rejected
 
-## Database Tables
+## Database Tables (SQLAlchemy models)
 - users, sessions, document_requests, payments, grade_change_petitions, major_applications, calendar_events, notifications
 
-## Recent Changes (Feb 8, 2026)
-- Removed Replit Auth integration entirely
-- Implemented passport-local + bcrypt authentication
-- Simplified from 5 roles to 3 roles (student, instructor, admin)
-- Added admin approval/reject workflow with comments
-- Updated all frontend pages for role-based access
-- Added demo credential buttons on login page
-- Seeded 3 user accounts and sample calendar events
+## Running the Application
+- `npm run dev` starts Express (port 5000) which spawns Flask (port 5001) and Vite
+- Express proxies all /api/* requests to Flask backend
+- Frontend served by Vite through Express
+
+## Recent Changes (Feb 9, 2026)
+- Migrated backend from Express.js to Flask (Python) with SQLAlchemy
+- Implemented JWT authentication (Flask-JWT-Extended) replacing session-based auth
+- Created SQLAlchemy models matching existing PostgreSQL schema
+- Added Flask Blueprint routes for all API endpoints
+- Updated frontend to use JWT tokens (localStorage) with Bearer auth headers
+- Express server now proxies API requests to Flask backend
+- End-to-end tested: login, dashboard, token persistence across page reloads
