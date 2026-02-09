@@ -104,6 +104,14 @@ export function useCreatePetition() {
       queryClient.invalidateQueries({ queryKey: [api.petitions.list.path] });
       toast({ title: "Petition Submitted", description: "Your grade change petition has been submitted for review." });
     },
+    onError: (error: Error) => {
+      let msg = "Failed to submit petition.";
+      try {
+        const parsed = JSON.parse(error.message.replace(/^\d+:\s*/, ''));
+        if (parsed.message) msg = parsed.message;
+      } catch { /* use default */ }
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    },
   });
 }
 
