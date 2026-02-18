@@ -51,63 +51,91 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  await registerRoutes(httpServer, app);
-
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    console.error("Internal Server Error:", err);
-
-    if (res.headersSent) {
-      return next(err);
-    }
-
-    return res.status(status).json({ message });
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
+    log("Production mode: starting Flask on port 5000 directly");
+    const pythonCmd = "python3";
+
+    const flaskProcess = spawn(pythonCmd, ["run.py"], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, FLASK_PORT: "5000", NODE_ENV: "production" },
+    });
+
+    flaskProcess.on("error", (err) => {
+      log(`Failed to start Flask: ${err.message}`, "flask");
+    });
+
+    flaskProcess.stdout?.on("data", (data: Buffer) => {
+      log(data.toString().trim(), "flask");
+    });
+
+    flaskProcess.stderr?.on("data", (data: Buffer) => {
+      log(data.toString().trim(), "flask");
+    });
+
+    flaskProcess.on("exit", (code: number | null) => {
+      log(`Flask process exited with code ${code}`, "flask");
+      process.exit(code || 1);
+    });
+
+    process.on("exit", () => {
+      flaskProcess.kill();
+    });
   } else {
+    await registerRoutes(httpServer, app);
+
+    app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+
+      console.error("Internal Server Error:", err);
+
+      if (res.headersSent) {
+        return next(err);
+      }
+
+      return res.status(status).json({ message });
+    });
+
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
+
+    const pythonCmd = "python3";
+    log(`Starting Flask with: ${pythonCmd} run.py`, "flask");
+
+    const flaskProcess = spawn(pythonCmd, ["run.py"], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env },
+    });
+
+    flaskProcess.on("error", (err) => {
+      log(`Failed to start Flask: ${err.message}`, "flask");
+    });
+
+    flaskProcess.stdout?.on("data", (data: Buffer) => {
+      log(data.toString().trim(), "flask");
+    });
+
+    flaskProcess.stderr?.on("data", (data: Buffer) => {
+      log(data.toString().trim(), "flask");
+    });
+
+    flaskProcess.on("exit", (code: number | null) => {
+      log(`Flask process exited with code ${code}`, "flask");
+    });
+
+    process.on("exit", () => {
+      flaskProcess.kill();
+    });
+
+    const port = parseInt(process.env.PORT || "5000", 10);
+    httpServer.listen(
+      {
+        port,
+        host: "0.0.0.0",
+      },
+      () => {
+        log(`serving on port ${port}`);
+      },
+    );
   }
-
-  const flaskProcess = spawn("python", ["run.py"], {
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env },
-  });
-
-  flaskProcess.stdout?.on("data", (data: Buffer) => {
-    log(data.toString().trim(), "flask");
-  });
-
-  flaskProcess.stderr?.on("data", (data: Buffer) => {
-    log(data.toString().trim(), "flask");
-  });
-
-  flaskProcess.on("exit", (code: number | null) => {
-    log(`Flask process exited with code ${code}`, "flask");
-  });
-
-  process.on("exit", () => {
-    flaskProcess.kill();
-  });
-
-  await new Promise<void>((resolve) => setTimeout(resolve, 2000));
-
-  const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
 })();

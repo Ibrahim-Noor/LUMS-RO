@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
@@ -10,7 +10,14 @@ bcrypt = Bcrypt()
 jwt = JWTManager()
 
 def create_app():
-    app = Flask(__name__, static_folder=None)
+    static_dir = os.path.join(os.getcwd(), 'dist', 'public')
+    is_production = os.environ.get('NODE_ENV') == 'production' or os.environ.get('REPL_DEPLOYMENT') == '1'
+
+    if is_production and os.path.isdir(static_dir):
+        app = Flask(__name__, static_folder=static_dir, static_url_path='')
+        print(f"Production mode: serving static files from {static_dir}", flush=True)
+    else:
+        app = Flask(__name__, static_folder=None)
 
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', '')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -54,6 +61,15 @@ def create_app():
     app.register_blueprint(cal_bp, url_prefix='/api')
     app.register_blueprint(pay_bp, url_prefix='/api')
     app.register_blueprint(notif_bp, url_prefix='/api')
+
+    if is_production and os.path.isdir(static_dir):
+        @app.route('/', defaults={'path': ''})
+        @app.route('/<path:path>')
+        def serve_spa(path):
+            file_path = os.path.join(static_dir, path)
+            if path and os.path.isfile(file_path):
+                return send_from_directory(static_dir, path)
+            return send_from_directory(static_dir, 'index.html')
 
     with app.app_context():
         from flask_app.seed import seed_data
