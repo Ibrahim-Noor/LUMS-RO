@@ -12,4 +12,5 @@ dependencies = [
     "gunicorn>=25.0.3",
     "marshmallow>=4.2.2",
     "psycopg2-binary>=2.9.11",
+    "pytest>=9.0.2",
 ]

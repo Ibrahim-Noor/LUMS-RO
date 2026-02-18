@@ -9,7 +9,7 @@ db = SQLAlchemy()
 bcrypt = Bcrypt()
 jwt = JWTManager()
 
-def create_app():
+def create_app(test_config=None):
     static_dir = os.path.join(os.getcwd(), 'dist', 'public')
     is_production = os.environ.get('NODE_ENV') == 'production' or os.environ.get('REPL_DEPLOYMENT') == '1'
 
@@ -26,6 +26,9 @@ def create_app():
     app.config['JWT_TOKEN_LOCATION'] = ['headers']
     app.config['JWT_HEADER_NAME'] = 'Authorization'
     app.config['JWT_HEADER_TYPE'] = 'Bearer'
+
+    if test_config:
+        app.config.update(test_config)
 
     db.init_app(app)
     bcrypt.init_app(app)
@@ -71,8 +74,9 @@ def create_app():
                 return send_from_directory(static_dir, path)
             return send_from_directory(static_dir, 'index.html')
 
-    with app.app_context():
-        from flask_app.seed import seed_data
-        seed_data()
+    if not app.config.get('TESTING'):
+        with app.app_context():
+            from flask_app.seed import seed_data
+            seed_data()
 
     return app

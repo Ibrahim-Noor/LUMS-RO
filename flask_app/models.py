@@ -1,11 +1,12 @@
 from flask_app import db
 from datetime import datetime
+import uuid
 
 
 class User(db.Model):
     __tablename__ = 'users'
 
-    id = db.Column(db.String, primary_key=True, server_default=db.text("gen_random_uuid()"))
+    id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()), server_default=db.text("gen_random_uuid()"))
     email = db.Column(db.String, unique=True, nullable=True)
     username = db.Column(db.Text, unique=True, nullable=False)
     password_hash = db.Column(db.Text, nullable=False)
